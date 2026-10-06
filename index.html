@@ -56,14 +56,14 @@
       padding: 16px 12px 40px 12px;
       max-width: 800px;
       margin: 0 auto;
-      user-select: none;
+      user-select: none; /* Sensação de app nativo */
     }
 
     /* Cabeçalho */
     header {
       text-align: center;
-      margin-bottom: 16px;
-      padding-top: 8px;
+      margin-bottom: 20px;
+      padding-top: 10px;
     }
 
     header h1 {
@@ -78,61 +78,28 @@
       margin-top: 4px;
     }
 
-    /* Card de Filtro por Mês */
-    .filter-card {
-      background-color: var(--card-bg);
-      border-radius: var(--border-radius);
-      padding: 14px 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    .month-picker-container {
+      margin-top: 12px;
       display: flex;
+      justify-content: center;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 8px;
     }
 
-    .filter-title {
+    .month-picker-container label {
       font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
 
-    .filter-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-      justify-content: flex-end;
-    }
-
-    .filter-controls input[type="month"] {
-      padding: 8px 12px;
+    .month-picker-container input[type="month"] {
+      padding: 6px 12px;
       border: 1px solid #d1d5db;
       border-radius: 10px;
-      font-size: 15px;
+      font-size: 14px;
       background-color: #fff;
       color: var(--text-color);
       outline: none;
-    }
-
-    .btn-secondary {
-      padding: 8px 12px;
-      background-color: #e5e7eb;
-      color: var(--text-color);
-      border: none;
-      border-radius: 10px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .btn-secondary:active {
-      background-color: #d1d5db;
     }
 
     /* Grid Resumo / Saldo */
@@ -206,6 +173,7 @@
       color: var(--text-muted);
     }
 
+    /* Forçar font-size 16px nos inputs evita zoom automático no iOS */
     .form-group input, 
     .form-group select {
       width: 100%;
@@ -298,13 +266,6 @@
     }
     .badge.receita { background-color: #d1fae5; color: #065f46; }
     .badge.despesa { background-color: #fee2e2; color: #991b1b; }
-    
-    .empty-state {
-      text-align: center;
-      padding: 24px;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-    }
   </style>
 </head>
 <body>
@@ -312,18 +273,11 @@
   <header>
     <h1>Pilas do Casal 💰</h1>
     <p>Controle financeiro compartilhado</p>
-  </header>
-
-  <!-- Filtro de Mês -->
-  <section class="filter-card">
-    <div class="filter-title">
-      📅 Periodo: <span id="label-mes-ativo" style="color: var(--primary);">Mês Atual</span>
-    </div>
-    <div class="filter-controls">
+    <div class="month-picker-container">
+      <label for="filtro-mes">Mês:</label>
       <input type="month" id="filtro-mes">
-      <button type="button" id="btn-mostrar-todos" class="btn-secondary">Ver Todos</button>
     </div>
-  </section>
+  </header>
 
   <!-- Dashboard de Resumo -->
   <section class="summary-grid">
@@ -336,7 +290,7 @@
       <div class="card-value despesa" id="total-despesa">R$ 0,00</div>
     </div>
     <div class="card">
-      <div class="card-title">Saldo</div>
+      <div class="card-title">Saldo Total</div>
       <div class="card-value saldo" id="total-saldo">R$ 0,00</div>
     </div>
   </section>
@@ -416,7 +370,7 @@
   </section>
 
   <script>
-    // Inicialização do Firebase
+    // Inicialização do Firebase com as suas chaves reais
     const firebaseConfig = {
       apiKey: "AIzaSyAPThd7n9SL6srDoMm7sqqHW-n5dGlF2vM",
       authDomain: "pilasdocasal.firebaseapp.com",
@@ -437,20 +391,19 @@
     const totalSaldoEl = document.getElementById('total-saldo');
     const inputData = document.getElementById('data');
     const filtroMesInput = document.getElementById('filtro-mes');
-    const btnMostrarTodos = document.getElementById('btn-mostrar-todos');
-    const labelMesAtivo = document.getElementById('label-mes-ativo');
 
-    // Variável para armazenar todos os dados do banco
+    // Preencher campo data com a data de hoje por padrão
+    const hoje = new Date();
+    inputData.valueAsDate = hoje;
+
+    // Selecionar o mês atual no filtro por padrão
+    const anoMesAtual = hoje.toISOString().slice(0, 7);
+    filtroMesInput.value = anoMesAtual;
+
     let todosLancamentos = [];
     let chartInstance = null;
 
-    // Configurar Mês Atual por Padrão no Filtro e na Data de Envio
-    const hoje = new Date();
-    const anoMesAtual = hoje.toISOString().slice(0, 7); // Ex: "2026-10"
-    filtroMesInput.value = anoMesAtual;
-    inputData.valueAsDate = hoje;
-
-    // Formatar Moeda
+    // Função para formatar moeda
     function formatarMoeda(valor) {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
     }
@@ -490,70 +443,6 @@
       }
     }
 
-    // Renderizar / Filtrar Dashboard
-    function renderizarDashboard() {
-      const mesSelecionado = filtroMesInput.value; // "YYYY-MM" ou ""
-      
-      // Atualizar Rótulo do Filtro
-      if (mesSelecionado) {
-        const [ano, mes] = mesSelecionado.split('-');
-        const nomeMes = new Date(ano, mes - 1).toLocaleString('pt-BR', { month: 'long' });
-        labelMesAtivo.textContent = `${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} / ${ano}`;
-      } else {
-        labelMesAtivo.textContent = "Acumulado Geral";
-      }
-
-      // Filtrar lançamentos pelo mês escolhido
-      const lancamentosFiltrados = todosLancamentos.filter(item => {
-        if (!mesSelecionado) return true;
-        return item.data && item.data.startsWith(mesSelecionado);
-      });
-
-      let totalReceita = 0;
-      let totalDespesa = 0;
-      listaLancamentos.innerHTML = '';
-
-      if (lancamentosFiltrados.length === 0) {
-        listaLancamentos.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhum lançamento encontrado para este período.</td></tr>`;
-      } else {
-        lancamentosFiltrados.forEach((data) => {
-          if (data.tipo === 'receita') {
-            totalReceita += data.valor;
-          } else {
-            totalDespesa += data.valor;
-          }
-
-          // Criar linha da tabela
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${data.data ? data.data.split('-').reverse().slice(0,2).join('/') : ''}</td>
-            <td>
-              <strong>${data.descricao}</strong><br>
-              <span class="badge ${data.tipo}">${data.categoria}</span>
-            </td>
-            <td style="color: ${data.tipo === 'receita' ? 'var(--receita)' : 'var(--despesa)'}; font-weight: 600;">
-              ${formatarMoeda(data.valor)}
-            </td>
-            <td>
-              <button class="btn-delete" onclick="deletarLancamento('${data.id}')">🗑️</button>
-            </td>
-          `;
-          listaLancamentos.appendChild(tr);
-        });
-      }
-
-      // Atualizar totais
-      totalReceitaEl.textContent = formatarMoeda(totalReceita);
-      totalDespesaEl.textContent = formatarMoeda(totalDespesa);
-      
-      const saldo = totalReceita - totalDespesa;
-      totalSaldoEl.textContent = formatarMoeda(saldo);
-      totalSaldoEl.style.color = saldo >= 0 ? 'var(--primary)' : 'var(--despesa)';
-
-      // Atualizar Gráfico
-      atualizarGrafico(lancamentosFiltrados);
-    }
-
     // Atualizar Gráfico de Categorias
     function atualizarGrafico(lancamentos) {
       const despesas = lancamentos.filter(l => l.tipo === 'despesa');
@@ -575,7 +464,7 @@
       chartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: labels.length ? labels : ['Sem despesas'],
+          labels: labels.length ? labels : ['Sem dados'],
           datasets: [{
             data: values.length ? values : [1],
             backgroundColor: labels.length ? [
@@ -593,24 +482,12 @@
       });
     }
 
-    // Eventos do Filtro
-    filtroMesInput.addEventListener('change', renderizarDashboard);
-    btnMostrarTodos.addEventListener('click', () => {
-      filtroMesInput.value = '';
-      renderizarDashboard();
-    });
+    // Renderizar Lançamentos filtrados pelo Mês
+    function renderizar() {
+      const mesSelecionado = filtroMesInput.value;
+      let totalReceita = 0;
+      let totalDespesa = 0;
 
-    // Escutar mudanças no Firebase em Tempo Real
-    db.collection('lancamentos').orderBy('data', 'desc').onSnapshot((snapshot) => {
-      todosLancamentos = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        data.id = doc.id;
-        todosLancamentos.push(data);
-      });
+      listaLancamentos.innerHTML = '';
 
-      renderizarDashboard();
-    });
-  </script>
-</body>
-</html>
+      const lancamentosFiltrados = todosLancamentos.
